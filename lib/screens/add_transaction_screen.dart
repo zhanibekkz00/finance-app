@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/transaction_provider.dart';
 import '../../models/transaction_model.dart';
+import '../../models/category_model.dart';
 import 'package:uuid/uuid.dart';
 import '../../providers/category_provider.dart';
 import 'package:finance_app/l10n/generated/app_localizations.dart';
@@ -90,7 +91,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                     : categories
                             .where((c) => c.id == _selectedCategoryId)
                             .firstOrNull
-                            ?.name ??
+                            ?.getLocalizedName(context) ??
                         l10n.selectCategory,
               ),
               leading: Container(

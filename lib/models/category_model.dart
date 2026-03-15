@@ -1,3 +1,6 @@
+import 'package:flutter/material.dart';
+import '../l10n/generated/app_localizations.dart';
+
 class CategoryModel {
   final String id;
   final String name;
@@ -19,7 +22,7 @@ class CategoryModel {
       'name': name,
       'colorValue': colorValue,
       'iconCode': iconCode,
-      'isDefault': isDefault ? 1 : 0,
+      'isDefault': isDefault,
     };
   }
 
@@ -29,7 +32,36 @@ class CategoryModel {
       name: map['name'],
       colorValue: map['colorValue'],
       iconCode: map['iconCode'],
-      isDefault: map['isDefault'] == 1,
+      isDefault: map['isDefault'] == true || map['isDefault'] == 1,
     );
+  }
+}
+
+extension CategoryLocalization on CategoryModel {
+  String getLocalizedName(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    if (l10n == null) return name;
+
+    if (isDefault) {
+      switch (name) {
+        case 'Еда':
+        case 'Food':
+        case 'Тамақ':
+          return l10n.categoryFood;
+        case 'Развлечения':
+        case 'Entertainment':
+        case 'Ойын-сауық':
+          return l10n.categoryEntertainment;
+        case 'Поездки':
+        case 'Trips':
+        case 'Сапарлар':
+          return l10n.categoryTrips;
+        case 'Зарплата':
+        case 'Salary':
+        case 'Жалақы':
+          return l10n.categorySalary;
+      }
+    }
+    return name;
   }
 }

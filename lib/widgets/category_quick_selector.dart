@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/category_provider.dart';
 import 'package:finance_app/l10n/generated/app_localizations.dart';
+import '../models/category_model.dart';
 
 class CategoryQuickSelector extends ConsumerWidget {
   final String currentCategoryId;
@@ -64,7 +65,7 @@ class CategoryQuickSelector extends ConsumerWidget {
                             color: Colors.white,
                           ),
                         ),
-                        title: Text(category.name),
+                        title: Text(category.getLocalizedName(context)),
                         trailing: isSelected
                             ? const Icon(Icons.check, color: Colors.green)
                             : null,

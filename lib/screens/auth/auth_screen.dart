@@ -51,7 +51,12 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     if (!mounted) return;
 
     if (success) {
-      Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
+      final auth = ref.read(authProvider);
+      if (auth.role == 'admin') {
+        Navigator.pushReplacementNamed(context, AppRoutes.admin);
+      } else {
+        Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

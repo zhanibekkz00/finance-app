@@ -152,4 +152,34 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get confirm => 'Подтвердить';
+
+  @override
+  String get categoryFood => 'Еда';
+
+  @override
+  String get categoryEntertainment => 'Развлечения';
+
+  @override
+  String get categoryTrips => 'Поездки';
+
+  @override
+  String get categorySalary => 'Зарплата';
+
+  @override
+  String get jointBudget => 'Общий бюджет';
+
+  @override
+  String get shareGroupCode => 'Поделиться кодом группы';
+
+  @override
+  String get joinGroup => 'Присоединиться к группе';
+
+  @override
+  String get logout => 'Выход';
+
+  @override
+  String get notifications => 'Уведомления';
+
+  @override
+  String get noNotifications => 'Уведомлений пока нет';
 }

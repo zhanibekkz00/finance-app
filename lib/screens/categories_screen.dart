@@ -19,7 +19,7 @@ class CategoriesScreen extends ConsumerWidget {
           final c = categories[index];
           return ListTile(
             leading: CircleAvatar(backgroundColor: Color(c.colorValue)),
-            title: Text(c.name),
+            title: Text(c.getLocalizedName(context)),
             trailing: IconButton(
               icon: const Icon(Icons.delete, color: Colors.red),
               onPressed: () => ref.read(categoryProvider.notifier).delete(c.id),

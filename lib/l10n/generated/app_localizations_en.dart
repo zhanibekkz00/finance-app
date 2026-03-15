@@ -152,4 +152,34 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get confirm => 'Confirm';
+
+  @override
+  String get categoryFood => 'Food';
+
+  @override
+  String get categoryEntertainment => 'Entertainment';
+
+  @override
+  String get categoryTrips => 'Trips';
+
+  @override
+  String get categorySalary => 'Salary';
+
+  @override
+  String get jointBudget => 'Joint Budget';
+
+  @override
+  String get shareGroupCode => 'Share Group Code';
+
+  @override
+  String get joinGroup => 'Join Group';
+
+  @override
+  String get logout => 'Logout';
+
+  @override
+  String get notifications => 'Notifications';
+
+  @override
+  String get noNotifications => 'No notifications yet';
 }

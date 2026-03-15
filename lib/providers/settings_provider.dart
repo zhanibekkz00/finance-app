@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 class AppSettings {
   final ThemeMode themeMode;
@@ -12,7 +13,8 @@ class AppSettings {
     this.currencyCode = 'USD',
   });
 
-  AppSettings copyWith({ThemeMode? themeMode, Locale? locale, String? currencyCode}) {
+  AppSettings copyWith(
+      {ThemeMode? themeMode, Locale? locale, String? currencyCode}) {
     return AppSettings(
       themeMode: themeMode ?? this.themeMode,
       locale: locale ?? this.locale,
@@ -25,15 +27,18 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   SettingsNotifier() : super(AppSettings());
 
   void toggleTheme() {
-    final newMode = state.themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
+    final newMode =
+        state.themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
     state = state.copyWith(themeMode: newMode);
   }
 
   void setLocale(Locale cx) {
+    Intl.defaultLocale = cx.languageCode;
     state = state.copyWith(locale: cx);
   }
 }
 
-final settingsProvider = StateNotifierProvider<SettingsNotifier, AppSettings>((ref) {
+final settingsProvider =
+    StateNotifierProvider<SettingsNotifier, AppSettings>((ref) {
   return SettingsNotifier();
 });

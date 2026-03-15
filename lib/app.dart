@@ -8,6 +8,9 @@ import 'screens/auth/onboarding_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/add_transaction_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/admin/admin_home_screen.dart';
+import 'widgets/admin_wrapper.dart';
+import 'screens/notifications_screen.dart';
 
 import 'l10n/generated/app_localizations.dart';
 
@@ -18,6 +21,8 @@ class AppRoutes {
   static const String dashboard = '/dashboard';
   static const String addTransaction = '/add_transaction';
   static const String settings = '/settings';
+  static const String admin = '/admin';
+  static const String notifications = '/notifications';
 }
 
 class AppRoot extends ConsumerWidget {
@@ -34,7 +39,11 @@ class AppRoot extends ConsumerWidget {
         body: Center(child: CircularProgressIndicator()),
       );
     } else if (auth.status == AuthStatus.authenticated) {
-      home = const DashboardScreen();
+      if (auth.role == 'admin') {
+        home = const AdminHomeScreen();
+      } else {
+        home = const DashboardScreen();
+      }
     } else {
       home = const OnboardingScreen();
     }
@@ -62,6 +71,9 @@ class AppRoot extends ConsumerWidget {
         AppRoutes.dashboard: (context) => const DashboardScreen(),
         AppRoutes.addTransaction: (context) => const AddTransactionScreen(),
         AppRoutes.settings: (context) => const SettingsScreen(),
+        AppRoutes.admin: (context) =>
+            const AdminWrapper(child: AdminHomeScreen()),
+        AppRoutes.notifications: (context) => const NotificationsScreen(),
       },
     );
   }

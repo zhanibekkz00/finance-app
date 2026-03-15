@@ -47,5 +47,15 @@
   "yearlyStats": "Статистика по годам",
   "editTransaction": "Редактировать транзакцию",
   "selectCategory": "Выберите категорию",
-  "confirm": "Подтвердить"
+  "confirm": "Подтвердить",
+  "categoryFood": "Еда",
+  "categoryEntertainment": "Развлечения",
+  "categoryTrips": "Поездки",
+  "categorySalary": "Зарплата",
+  "jointBudget": "Общий бюджет",
+  "shareGroupCode": "Поделиться кодом группы",
+  "joinGroup": "Присоединиться к группе",
+  "logout": "Выход",
+  "notifications": "Уведомления",
+  "noNotifications": "Уведомлений пока нет"
 }

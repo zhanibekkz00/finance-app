@@ -152,4 +152,34 @@ class AppLocalizationsKk extends AppLocalizations {
 
   @override
   String get confirm => 'Растау';
+
+  @override
+  String get categoryFood => 'Тамақ';
+
+  @override
+  String get categoryEntertainment => 'Ойын-сауық';
+
+  @override
+  String get categoryTrips => 'Сапарлар';
+
+  @override
+  String get categorySalary => 'Жалақы';
+
+  @override
+  String get jointBudget => 'Бірлескен бюджет';
+
+  @override
+  String get shareGroupCode => 'Топ кодын бөлісу';
+
+  @override
+  String get joinGroup => 'Топқа қосылу';
+
+  @override
+  String get logout => 'Шығу';
+
+  @override
+  String get notifications => 'Хабарландырулар';
+
+  @override
+  String get noNotifications => 'Әзірге хабарландырулар жоқ';
 }

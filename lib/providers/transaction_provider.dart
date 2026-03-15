@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/transaction_model.dart';
+import '../services/group_service.dart';
 import 'auth_provider.dart';
 
 class TransactionFilter {
@@ -26,22 +27,26 @@ class TransactionState {
   final List<TransactionModel> transactions;
   final TransactionFilter filter;
   final bool isLoading;
+  final String? currentGroupId;
 
   TransactionState({
     required this.transactions,
     required this.filter,
     this.isLoading = false,
+    this.currentGroupId,
   });
 
   TransactionState copyWith({
     List<TransactionModel>? transactions,
     TransactionFilter? filter,
     bool? isLoading,
+    String? currentGroupId,
   }) {
     return TransactionState(
       transactions: transactions ?? this.transactions,
       filter: filter ?? this.filter,
       isLoading: isLoading ?? this.isLoading,
+      currentGroupId: currentGroupId ?? this.currentGroupId,
     );
   }
 }
@@ -49,6 +54,7 @@ class TransactionState {
 class TransactionNotifier extends StateNotifier<TransactionState> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final Ref _ref;
+  final GroupService _groupService = GroupService();
   StreamSubscription? _subscription;
 
   TransactionNotifier(this._ref)
@@ -73,7 +79,7 @@ class TransactionNotifier extends StateNotifier<TransactionState> {
         _startListening();
       } else {
         _unsubscribe();
-        state = state.copyWith(transactions: []);
+        state = state.copyWith(transactions: [], currentGroupId: null);
       }
     });
 
@@ -82,31 +88,54 @@ class TransactionNotifier extends StateNotifier<TransactionState> {
     }
   }
 
+  /// Returns the top-level transactions collection
   CollectionReference<Map<String, dynamic>> get _collection {
-    final auth = _ref.read(authProvider);
-    if (auth.userId == null) throw Exception('User not authenticated');
-    return _firestore
-        .collection('users')
-        .doc(auth.userId)
-        .collection('transactions');
+    return _firestore.collection('transactions');
   }
 
-  void _startListening() {
+  Future<void> _startListening() async {
     _unsubscribe();
     state = state.copyWith(isLoading: true);
-    final auth = _ref.read(authProvider);
-    debugPrint(
-        'TransactionNotifier: Starting to listen for user ${auth.userId}');
 
-    _subscription = _collection
-        .orderBy('date', descending: true)
-        .snapshots()
-        .listen((snapshot) {
+    final auth = _ref.read(authProvider);
+    if (auth.userId == null) return;
+
+    debugPrint('TransactionNotifier: Starting setup for user ${auth.userId}');
+
+    // 1. Determine Group ID
+    String? groupId = await _groupService.getUserGroupId(auth.userId!);
+    state = state.copyWith(currentGroupId: groupId);
+
+    debugPrint('TransactionNotifier: Group ID is $groupId');
+
+    // 2. Build Query
+    Query<Map<String, dynamic>> query = _collection;
+
+    if (groupId != null) {
+      // If in a group, fetch all transactions for that group
+      query = query.where('groupId', isEqualTo: groupId);
+    } else {
+      // Otherwise, fetch private transactions for this user
+      // Note: This relies on legacy transactions effectively being "private" or migrated.
+      // Ideally, legacy data would be backfilled with userId.
+      query = query.where('userId', isEqualTo: auth.userId);
+    }
+
+    // Apply sorting
+    query = query.orderBy('date', descending: true);
+
+    _subscription = query.snapshots().listen((snapshot) {
       debugPrint(
           'TransactionNotifier: Received snapshot with ${snapshot.docs.length} docs');
 
+      if (snapshot.docs.isEmpty) {
+        debugPrint(
+            'TransactionNotifier: No transactions found for this ${groupId != null ? "group" : "user"}. Path: transactions, groupId: $groupId, userId: ${auth.userId}');
+      }
+
       final transactions = snapshot.docs.map((doc) {
         final data = doc.data();
+        debugPrint('TransactionNotifier: Found doc ${doc.id}');
         return TransactionModel(
           id: doc.id,
           type:
@@ -115,14 +144,17 @@ class TransactionNotifier extends StateNotifier<TransactionState> {
           categoryId: data['categoryId'] ?? '',
           date: (data['date'] as Timestamp).toDate(),
           note: data['note'] ?? '',
-          isRecurring: data['isRecurring'] ?? false,
+          isRecurring:
+              (data['isRecurring'] == true || data['isRecurring'] == 1),
           currency: data['currency'] ?? 'USD',
           recurrenceInterval: RecurrenceInterval.values.firstWhere(
               (e) => e.name == (data['recurrenceInterval'] ?? 'none')),
           nextOccurrence: data['nextOccurrence'] != null
               ? (data['nextOccurrence'] as Timestamp).toDate()
               : null,
-          isPinned: data['isPinned'] ?? false,
+          isPinned: (data['isPinned'] == true || data['isPinned'] == 1),
+          userId: data['userId'],
+          groupId: data['groupId'],
         );
       }).toList();
 
@@ -131,7 +163,9 @@ class TransactionNotifier extends StateNotifier<TransactionState> {
         isLoading: false,
       );
     }, onError: (e) {
-      debugPrint('TransactionNotifier: Snapshot error: $e');
+      debugPrint('TransactionNotifier: Snapshot error type: ${e.runtimeType}');
+      debugPrint('TransactionNotifier: Snapshot error details: $e');
+      // Look for a link in this error - it might be a missing index!
       state = state.copyWith(isLoading: false);
     });
   }
@@ -146,8 +180,25 @@ class TransactionNotifier extends StateNotifier<TransactionState> {
 
   Future<void> add(TransactionModel tx) async {
     try {
-      final map = _toFirestoreMap(tx);
-      await _collection.doc(tx.id).set(map);
+      final auth = _ref.read(authProvider);
+      if (auth.userId == null) throw Exception('User not authenticated');
+
+      // Refresh group ID to be safe, or use cached state
+      String? groupId = state.currentGroupId;
+      // If state might be stale, could refetch: await _groupService.getUserGroupId(auth.userId!);
+
+      final newTx = tx.copyWith(
+        userId: auth.userId,
+        groupId: groupId,
+      );
+
+      final map = _toFirestoreMap(newTx);
+      // We use add() to let Firestore generate the ID, or set() if ID is pre-generated/provided
+      if (newTx.id.isNotEmpty && newTx.id != 'new') {
+        await _collection.doc(newTx.id).set(map);
+      } else {
+        await _collection.add(map);
+      }
     } catch (e) {
       debugPrint('Error adding transaction: $e');
     }
@@ -170,20 +221,13 @@ class TransactionNotifier extends StateNotifier<TransactionState> {
   }
 
   Map<String, dynamic> _toFirestoreMap(TransactionModel tx) {
-    return {
-      'type': tx.type.name,
-      'amount': tx.amount,
-      'currency': tx.currency,
-      'categoryId': tx.categoryId,
-      'date': Timestamp.fromDate(tx.date),
-      'note': tx.note,
-      'isRecurring': tx.isRecurring,
-      'recurrenceInterval': tx.recurrenceInterval.name,
-      'nextOccurrence': tx.nextOccurrence != null
-          ? Timestamp.fromDate(tx.nextOccurrence!)
-          : null,
-      'isPinned': tx.isPinned,
-    };
+    final map = tx.toMap();
+    // Use Timestamps for better Firestore sorting and indexing
+    map['date'] = Timestamp.fromDate(tx.date);
+    if (tx.nextOccurrence != null) {
+      map['nextOccurrence'] = Timestamp.fromDate(tx.nextOccurrence!);
+    }
+    return map;
   }
 
   Future<void> togglePin(String id) async {

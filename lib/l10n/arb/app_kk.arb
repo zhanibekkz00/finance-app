@@ -47,5 +47,15 @@
   "yearlyStats": "Жылдық статистика",
   "editTransaction": "Транзакцияны өңдеу",
   "selectCategory": "Санатты таңдаңыз",
-  "confirm": "Растау"
+  "confirm": "Растау",
+  "categoryFood": "Тамақ",
+  "categoryEntertainment": "Ойын-сауық",
+  "categoryTrips": "Сапарлар",
+  "categorySalary": "Жалақы",
+  "jointBudget": "Бірлескен бюджет",
+  "shareGroupCode": "Топ кодын бөлісу",
+  "joinGroup": "Топқа қосылу",
+  "logout": "Шығу",
+  "notifications": "Хабарландырулар",
+  "noNotifications": "Әзірге хабарландырулар жоқ"
 }

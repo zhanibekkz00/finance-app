@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/transaction_provider.dart';
 import '../providers/category_provider.dart';
 import '../models/transaction_model.dart';
+import '../models/category_model.dart';
 import 'package:intl/intl.dart';
 import 'package:finance_app/l10n/generated/app_localizations.dart';
 
@@ -31,7 +32,9 @@ class CategoryStatsScreen extends ConsumerWidget {
     // Calculate monthly stats
     final monthlyStats = <String, double>{};
     for (var tx in transactions) {
-      final monthKey = DateFormat('MMM yyyy').format(tx.date);
+      final monthKey =
+          DateFormat('MMM yyyy', Localizations.localeOf(context).toString())
+              .format(tx.date);
       monthlyStats[monthKey] = (monthlyStats[monthKey] ?? 0) + tx.amount;
     }
 
@@ -67,7 +70,7 @@ class CategoryStatsScreen extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            category?.name ?? 'Unknown',
+                            category?.getLocalizedName(context) ?? 'Unknown',
                             style: Theme.of(context).textTheme.headlineSmall,
                           ),
                           Text(
@@ -159,7 +162,9 @@ class CategoryStatsScreen extends ConsumerWidget {
                       return ListTile(
                         contentPadding: EdgeInsets.zero,
                         title: Text(tx.note.isEmpty ? 'No note' : tx.note),
-                        subtitle: Text(DateFormat.yMMMd().format(tx.date)),
+                        subtitle: Text(DateFormat.yMMMd(
+                                Localizations.localeOf(context).toString())
+                            .format(tx.date)),
                         trailing: Text(
                           '${tx.type == TransactionType.income ? '+' : '-'}${tx.amount} ${tx.currency}',
                           style: TextStyle(

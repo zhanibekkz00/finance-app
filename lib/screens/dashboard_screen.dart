@@ -4,6 +4,7 @@ import '../app.dart';
 import '../providers/transaction_provider.dart';
 import '../providers/category_provider.dart';
 import '../models/transaction_model.dart';
+import '../models/category_model.dart';
 import 'package:intl/intl.dart';
 import 'package:finance_app/l10n/generated/app_localizations.dart';
 import 'edit_transaction_screen.dart';
@@ -70,7 +71,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 TransactionShareHelper.shareTransaction(
                   context,
                   tx,
-                  category?.name ?? 'Unknown',
+                  category?.getLocalizedName(context) ?? 'Unknown',
                 );
               },
             ),
@@ -171,7 +172,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       final q = _searchQuery.toLowerCase();
       final category =
           ref.read(categoryProvider.notifier).getCategoryById(tx.categoryId);
-      final catName = category?.name.toLowerCase() ?? '';
+      final catName = category?.getLocalizedName(context).toLowerCase() ?? '';
 
       return tx.note.toLowerCase().contains(q) ||
           tx.amount.toString().contains(q) ||
@@ -255,7 +256,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ),
                     title: Row(
                       children: [
-                        Expanded(child: Text(category?.name ?? 'Unknown')),
+                        Expanded(
+                            child: Text(category?.getLocalizedName(context) ??
+                                'Unknown')),
                         if (tx.isPinned)
                           const Icon(
                             Icons.push_pin,
@@ -271,7 +274,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           Text(tx.note,
                               style: const TextStyle(
                                   fontSize: 12, color: Colors.grey)),
-                        Text(DateFormat.yMMMd().format(tx.date)),
+                        Text(DateFormat.yMMMd(
+                                Localizations.localeOf(context).toString())
+                            .format(tx.date)),
                       ],
                     ),
                     trailing: Row(

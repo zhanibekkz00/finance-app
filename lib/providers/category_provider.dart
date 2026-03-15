@@ -27,7 +27,7 @@ class CategoryNotifier extends StateNotifier<List<CategoryModel>> {
 
   void _init() {
     _ref.listen(authProvider, (previous, next) {
-      if (next.status == AuthStatus.authenticated && 
+      if (next.status == AuthStatus.authenticated &&
           previous?.status != AuthStatus.authenticated) {
         _startListening();
       } else if (next.status == AuthStatus.unauthenticated) {
@@ -77,7 +77,7 @@ class CategoryNotifier extends StateNotifier<List<CategoryModel>> {
           name: data['name'] ?? 'Unknown',
           colorValue: data['colorValue'] ?? 0xFF9E9E9E,
           iconCode: data['iconCode'] ?? 0xe88a,
-          isDefault: data['isDefault'] ?? false,
+          isDefault: data['isDefault'] == true || data['isDefault'] == 1,
         );
       }).toList();
 

@@ -22,6 +22,8 @@ class TransactionModel {
   final RecurrenceInterval recurrenceInterval;
   final DateTime? nextOccurrence;
   final bool isPinned;
+  final String? userId; // Added for joint budget
+  final String? groupId; // Added for joint budget
 
   TransactionModel({
     required this.id,
@@ -35,6 +37,8 @@ class TransactionModel {
     this.recurrenceInterval = RecurrenceInterval.none,
     this.nextOccurrence,
     this.isPinned = false,
+    this.userId,
+    this.groupId,
   });
 
   TransactionModel copyWith({
@@ -49,6 +53,8 @@ class TransactionModel {
     RecurrenceInterval? recurrenceInterval,
     DateTime? nextOccurrence,
     bool? isPinned,
+    String? userId,
+    String? groupId,
   }) {
     return TransactionModel(
       id: id ?? this.id,
@@ -62,6 +68,8 @@ class TransactionModel {
       recurrenceInterval: recurrenceInterval ?? this.recurrenceInterval,
       nextOccurrence: nextOccurrence ?? this.nextOccurrence,
       isPinned: isPinned ?? this.isPinned,
+      userId: userId ?? this.userId,
+      groupId: groupId ?? this.groupId,
     );
   }
 
@@ -73,11 +81,13 @@ class TransactionModel {
       'categoryId': categoryId,
       'date': date.toIso8601String(),
       'note': note,
-      'isRecurring': isRecurring ? 1 : 0,
+      'isRecurring': isRecurring, // Use native bool
       'currency': currency,
       'recurrenceInterval': recurrenceInterval.name,
       'nextOccurrence': nextOccurrence?.toIso8601String(),
-      'isPinned': isPinned ? 1 : 0,
+      'isPinned': isPinned, // Use native bool
+      'userId': userId,
+      'groupId': groupId,
     };
   }
 
@@ -89,14 +99,16 @@ class TransactionModel {
       categoryId: map['categoryId'],
       date: DateTime.parse(map['date']),
       note: map['note'],
-      isRecurring: map['isRecurring'] == 1,
+      isRecurring: map['isRecurring'] == true || map['isRecurring'] == 1,
       currency: map['currency'],
       recurrenceInterval: RecurrenceInterval.values
           .firstWhere((e) => e.name == map['recurrenceInterval']),
       nextOccurrence: map['nextOccurrence'] != null
           ? DateTime.parse(map['nextOccurrence'])
           : null,
-      isPinned: map['isPinned'] == 1,
+      isPinned: map['isPinned'] == true || map['isPinned'] == 1,
+      userId: map['userId'],
+      groupId: map['groupId'],
     );
   }
 }

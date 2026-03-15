@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/transaction_provider.dart';
 import '../models/transaction_model.dart';
+import '../models/category_model.dart';
 import '../providers/category_provider.dart';
+import 'package:intl/intl.dart';
 import 'package:finance_app/l10n/generated/app_localizations.dart';
 
 class EditTransactionScreen extends ConsumerStatefulWidget {
@@ -118,7 +120,7 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
                                 color: Color(c.colorValue),
                                 size: 16),
                             const SizedBox(width: 8),
-                            Text(c.name),
+                            Text(c.getLocalizedName(context)),
                           ],
                         ),
                       ))
@@ -138,7 +140,9 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
             // Date Picker
             ListTile(
               title: Text(l10n.date),
-              subtitle: Text(_selectedDate.toString().split(' ')[0]),
+              subtitle: Text(
+                  DateFormat.yMMMd(Localizations.localeOf(context).toString())
+                      .format(_selectedDate)),
               trailing: const Icon(Icons.calendar_today),
               onTap: () async {
                 final picked = await showDatePicker(

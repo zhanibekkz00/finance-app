@@ -47,5 +47,15 @@
   "yearlyStats": "Yearly Statistics",
   "editTransaction": "Edit Transaction",
   "selectCategory": "Select Category",
-  "confirm": "Confirm"
+  "confirm": "Confirm",
+  "categoryFood": "Food",
+  "categoryEntertainment": "Entertainment",
+  "categoryTrips": "Trips",
+  "categorySalary": "Salary",
+  "jointBudget": "Joint Budget",
+  "shareGroupCode": "Share Group Code",
+  "joinGroup": "Join Group",
+  "logout": "Logout",
+  "notifications": "Notifications",
+  "noNotifications": "No notifications yet"
 }
