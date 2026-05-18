@@ -14,18 +14,18 @@ export class CategoriesController {
     @Query('includeDefault') includeDefault?: string,
   ) {
     return this.categoriesService.findAll(
-      req.user.userId,
+      req.user.id,
       includeDefault !== 'false',
     );
   }
 
   @Post()
   async create(@Request() req, @Body() dto: CreateCategoryDto) {
-    return this.categoriesService.create(req.user.userId, dto);
+    return this.categoriesService.create(req.user.id, dto);
   }
 
   @Delete(':id')
   async delete(@Request() req, @Param('id') id: string) {
-    return this.categoriesService.delete(req.user.userId, id);
+    return this.categoriesService.delete(req.user.id, id);
   }
 }

@@ -11,7 +11,10 @@ import 'screens/settings_screen.dart';
 import 'screens/admin/admin_home_screen.dart';
 import 'widgets/admin_wrapper.dart';
 import 'screens/notifications_screen.dart';
-
+import 'screens/profile_screen.dart';
+import 'screens/groups/group_stats_screen.dart';
+import 'screens/debts/debts_screen.dart';
+import 'screens/debts/add_debt_screen.dart';
 import 'l10n/generated/app_localizations.dart';
 
 class AppRoutes {
@@ -23,6 +26,10 @@ class AppRoutes {
   static const String settings = '/settings';
   static const String admin = '/admin';
   static const String notifications = '/notifications';
+  static const String profile = '/profile';
+  static const String groupStats = '/group_stats';
+  static const String debts = '/debts';
+  static const String addDebt = '/add_debt';
 }
 
 class AppRoot extends ConsumerWidget {
@@ -74,6 +81,10 @@ class AppRoot extends ConsumerWidget {
         AppRoutes.admin: (context) =>
             const AdminWrapper(child: AdminHomeScreen()),
         AppRoutes.notifications: (context) => const NotificationsScreen(),
+        AppRoutes.profile: (context) => const ProfileScreen(),
+        AppRoutes.groupStats: (context) => const GroupStatsScreen(),
+        AppRoutes.debts: (context) => const DebtsScreen(),
+        AppRoutes.addDebt: (context) => const AddDebtScreen(),
       },
     );
   }

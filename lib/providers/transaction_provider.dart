@@ -1,9 +1,10 @@
 import 'dart:async';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/transaction_model.dart';
 import '../services/group_service.dart';
+import '../services/api_service.dart';
 import 'auth_provider.dart';
 
 class TransactionFilter {
@@ -52,122 +53,93 @@ class TransactionState {
 }
 
 class TransactionNotifier extends StateNotifier<TransactionState> {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final ApiService _apiService = ApiService();
   final Ref _ref;
   final GroupService _groupService = GroupService();
-  StreamSubscription? _subscription;
 
   TransactionNotifier(this._ref)
       : super(TransactionState(transactions: [], filter: TransactionFilter())) {
     _init();
   }
 
-  @override
-  void dispose() {
-    _unsubscribe();
-    super.dispose();
-  }
-
-  void _unsubscribe() {
-    _subscription?.cancel();
-    _subscription = null;
-  }
-
   void _init() {
     _ref.listen(authProvider, (previous, next) {
       if (next.status == AuthStatus.authenticated) {
-        _startListening();
+        fetchTransactions();
       } else {
-        _unsubscribe();
         state = state.copyWith(transactions: [], currentGroupId: null);
       }
     });
 
     if (_ref.read(authProvider).status == AuthStatus.authenticated) {
-      _startListening();
+      fetchTransactions();
     }
   }
 
-  /// Returns the top-level transactions collection
-  CollectionReference<Map<String, dynamic>> get _collection {
-    return _firestore.collection('transactions');
-  }
-
-  Future<void> _startListening() async {
-    _unsubscribe();
+  Future<void> fetchTransactions() async {
     state = state.copyWith(isLoading: true);
 
     final auth = _ref.read(authProvider);
-    if (auth.userId == null) return;
-
-    debugPrint('TransactionNotifier: Starting setup for user ${auth.userId}');
-
-    // 1. Determine Group ID
-    String? groupId = await _groupService.getUserGroupId(auth.userId!);
-    state = state.copyWith(currentGroupId: groupId);
-
-    debugPrint('TransactionNotifier: Group ID is $groupId');
-
-    // 2. Build Query
-    Query<Map<String, dynamic>> query = _collection;
-
-    if (groupId != null) {
-      // If in a group, fetch all transactions for that group
-      query = query.where('groupId', isEqualTo: groupId);
-    } else {
-      // Otherwise, fetch private transactions for this user
-      // Note: This relies on legacy transactions effectively being "private" or migrated.
-      // Ideally, legacy data would be backfilled with userId.
-      query = query.where('userId', isEqualTo: auth.userId);
+    if (auth.userId == null) {
+      state = state.copyWith(isLoading: false);
+      return;
     }
 
-    // Apply sorting
-    query = query.orderBy('date', descending: true);
+    try {
+      // 1. Get Group ID
+      String? groupId = await _groupService.getUserGroupId(auth.userId!);
+      state = state.copyWith(currentGroupId: groupId);
 
-    _subscription = query.snapshots().listen((snapshot) {
-      debugPrint(
-          'TransactionNotifier: Received snapshot with ${snapshot.docs.length} docs');
+      // 2. Fetch from API
+      final response = await _apiService.get('/transactions');
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        final transactions = data.map((json) {
+          try {
+            // Robust parsing of amount (handles both String and num from Decimal)
+            double parsedAmount = 0.0;
+            if (json['amount'] is num) {
+              parsedAmount = (json['amount'] as num).toDouble();
+            } else if (json['amount'] is String) {
+              parsedAmount = double.tryParse(json['amount']) ?? 0.0;
+            }
 
-      if (snapshot.docs.isEmpty) {
-        debugPrint(
-            'TransactionNotifier: No transactions found for this ${groupId != null ? "group" : "user"}. Path: transactions, groupId: $groupId, userId: ${auth.userId}');
-      }
+            return TransactionModel(
+              id: json['id'],
+              type: TransactionType.values.firstWhere((e) => e.name == json['type']),
+              amount: parsedAmount,
+              categoryId: json['categoryId'] ?? '',
+              date: DateTime.parse(json['date']),
+              note: json['note'] ?? '',
+              isRecurring: json['isRecurring'] ?? false,
+              currency: json['currency'] ?? 'USD',
+              recurrenceInterval: RecurrenceInterval.values.firstWhere(
+                  (e) => e.name == (json['recurrenceInterval'] ?? 'none')),
+              nextOccurrence: json['nextOccurrence'] != null
+                  ? DateTime.parse(json['nextOccurrence'])
+                  : null,
+              isPinned: json['isPinned'] ?? false,
+              userId: json['userId'],
+              groupId: json['groupId'],
+            );
+          } catch (e) {
+            debugPrint('Error parsing transaction ${json['id']}: $e');
+            return null;
+          }
+        }).whereType<TransactionModel>().toList();
 
-      final transactions = snapshot.docs.map((doc) {
-        final data = doc.data();
-        debugPrint('TransactionNotifier: Found doc ${doc.id}');
-        return TransactionModel(
-          id: doc.id,
-          type:
-              TransactionType.values.firstWhere((e) => e.name == data['type']),
-          amount: (data['amount'] as num).toDouble(),
-          categoryId: data['categoryId'] ?? '',
-          date: (data['date'] as Timestamp).toDate(),
-          note: data['note'] ?? '',
-          isRecurring:
-              (data['isRecurring'] == true || data['isRecurring'] == 1),
-          currency: data['currency'] ?? 'USD',
-          recurrenceInterval: RecurrenceInterval.values.firstWhere(
-              (e) => e.name == (data['recurrenceInterval'] ?? 'none')),
-          nextOccurrence: data['nextOccurrence'] != null
-              ? (data['nextOccurrence'] as Timestamp).toDate()
-              : null,
-          isPinned: (data['isPinned'] == true || data['isPinned'] == 1),
-          userId: data['userId'],
-          groupId: data['groupId'],
+        state = state.copyWith(
+          transactions: _sort(transactions),
+          isLoading: false,
         );
-      }).toList();
-
-      state = state.copyWith(
-        transactions: _sort(transactions),
-        isLoading: false,
-      );
-    }, onError: (e) {
-      debugPrint('TransactionNotifier: Snapshot error type: ${e.runtimeType}');
-      debugPrint('TransactionNotifier: Snapshot error details: $e');
-      // Look for a link in this error - it might be a missing index!
+      } else {
+        debugPrint('Failed to fetch transactions: ${response.statusCode}');
+        state = state.copyWith(isLoading: false);
+      }
+    } catch (e) {
+      debugPrint('Error fetching transactions: $e');
       state = state.copyWith(isLoading: false);
-    });
+    }
   }
 
   List<TransactionModel> _sort(List<TransactionModel> txs) {
@@ -181,58 +153,83 @@ class TransactionNotifier extends StateNotifier<TransactionState> {
   Future<void> add(TransactionModel tx) async {
     try {
       final auth = _ref.read(authProvider);
-      if (auth.userId == null) throw Exception('User not authenticated');
+      if (auth.userId == null) {
+        debugPrint('Cannot add transaction: Auth is null');
+        return;
+      }
 
-      // Refresh group ID to be safe, or use cached state
-      String? groupId = state.currentGroupId;
-      // If state might be stale, could refetch: await _groupService.getUserGroupId(auth.userId!);
+      final body = {
+        'type': tx.type.name,
+        'amount': tx.amount,
+        'categoryId': tx.categoryId,
+        'date': tx.date.toIso8601String(),
+        'note': tx.note,
+        'currency': tx.currency,
+        'isRecurring': tx.isRecurring,
+        'recurrenceInterval': tx.recurrenceInterval.name,
+        'isPinned': tx.isPinned,
+      };
+      
+      debugPrint('Adding transaction: $body');
 
-      final newTx = tx.copyWith(
-        userId: auth.userId,
-        groupId: groupId,
-      );
+      final response = await _apiService.post('/transactions', body);
 
-      final map = _toFirestoreMap(newTx);
-      // We use add() to let Firestore generate the ID, or set() if ID is pre-generated/provided
-      if (newTx.id.isNotEmpty && newTx.id != 'new') {
-        await _collection.doc(newTx.id).set(map);
+      if (response.statusCode == 201) {
+        debugPrint('Transaction added successfully');
+        // Small delay to allow DB processing if needed, though usually instant
+        await fetchTransactions();
       } else {
-        await _collection.add(map);
+        debugPrint('Error adding transaction: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
-      debugPrint('Error adding transaction: $e');
+      debugPrint('Exception adding transaction: $e');
     }
   }
 
   Future<void> update(TransactionModel tx) async {
     try {
-      await _collection.doc(tx.id).update(_toFirestoreMap(tx));
+      final response = await _apiService.put('/transactions/${tx.id}', {
+        'type': tx.type.name,
+        'amount': tx.amount,
+        'categoryId': tx.categoryId,
+        'date': tx.date.toIso8601String(),
+        'note': tx.note,
+        'currency': tx.currency,
+        'isRecurring': tx.isRecurring,
+        'recurrenceInterval': tx.recurrenceInterval.name,
+        'isPinned': tx.isPinned,
+      });
+
+      if (response.statusCode == 200) {
+        await fetchTransactions();
+      } else {
+        debugPrint('Error updating transaction: ${response.statusCode}');
+      }
     } catch (e) {
-      debugPrint('Error updating transaction: $e');
+      debugPrint('Exception updating transaction: $e');
     }
   }
 
   Future<void> delete(String id) async {
     try {
-      await _collection.doc(id).delete();
+      final response = await _apiService.delete('/transactions/$id');
+      if (response.statusCode == 200) {
+        await fetchTransactions();
+      }
     } catch (e) {
       debugPrint('Error deleting transaction: $id');
     }
   }
 
-  Map<String, dynamic> _toFirestoreMap(TransactionModel tx) {
-    final map = tx.toMap();
-    // Use Timestamps for better Firestore sorting and indexing
-    map['date'] = Timestamp.fromDate(tx.date);
-    if (tx.nextOccurrence != null) {
-      map['nextOccurrence'] = Timestamp.fromDate(tx.nextOccurrence!);
-    }
-    return map;
-  }
-
   Future<void> togglePin(String id) async {
-    final tx = state.transactions.firstWhere((t) => t.id == id);
-    await update(tx.copyWith(isPinned: !tx.isPinned));
+    try {
+      final response = await _apiService.put('/transactions/$id/pin', {});
+      if (response.statusCode == 200) {
+        await fetchTransactions();
+      }
+    } catch (e) {
+      debugPrint('Error toggling pin: $e');
+    }
   }
 
   Map<String, dynamic> getCategoryStats(String categoryId) {

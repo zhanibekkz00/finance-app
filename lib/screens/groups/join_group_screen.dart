@@ -25,8 +25,8 @@ class _JoinGroupScreenState extends ConsumerState<JoinGroupScreen> {
 
   Future<void> _joinGroup() async {
     final code = _codeController.text.trim().toUpperCase();
-    if (code.length != 6) {
-      setState(() => _errorText = 'Code must be 6 characters');
+    if (code.isEmpty) {
+      setState(() => _errorText = 'Please enter a code');
       return;
     }
 
@@ -73,7 +73,7 @@ class _JoinGroupScreenState extends ConsumerState<JoinGroupScreen> {
             ),
             const SizedBox(height: 16),
             const Text(
-              'Enter the 6-character code shared by your partner to join their budget.',
+              'Enter the invite code shared by your partner to join their budget.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.grey),
             ),

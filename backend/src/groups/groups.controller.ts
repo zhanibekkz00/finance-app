@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Body, UseGuards, Delete, Request } from '@nestjs/common';
 import { GroupsService } from './groups.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('groups')
 @UseGuards(JwtAuthGuard)
@@ -25,5 +25,10 @@ export class GroupsController {
     @Delete('leave')
     leaveGroup(@Request() req) {
         return this.groupsService.leaveGroup(req.user.id);
+    }
+
+    @Get('stats')
+    getGroupStats(@Request() req) {
+        return this.groupsService.getGroupStats(req.user.id);
     }
 }

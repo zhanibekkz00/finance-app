@@ -75,10 +75,13 @@ export class TransactionsService {
   }
 
   async create(userId: string, dto: CreateTransactionDto) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { groupId: true } });
     return this.prisma.transaction.create({
       data: {
         ...dto,
         userId,
+        groupId: dto.groupId || user?.groupId,
+        categoryId: (dto.categoryId && dto.categoryId !== '') ? dto.categoryId : null,
         date: new Date(dto.date),
         nextOccurrence: dto.nextOccurrence ? new Date(dto.nextOccurrence) : null,
         note: dto.note || '',

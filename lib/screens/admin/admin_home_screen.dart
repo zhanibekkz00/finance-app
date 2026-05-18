@@ -350,6 +350,7 @@ class _UsersTabState extends ConsumerState<UsersTab> {
                       DataColumn(label: Text('ID')),
                       DataColumn(label: Text('Email')),
                       DataColumn(label: Text('Role')),
+                      DataColumn(label: Text('Group')),
                       DataColumn(label: Text('Status')),
                       DataColumn(label: Text('Actions')),
                     ],
@@ -377,6 +378,7 @@ class _UsersTabState extends ConsumerState<UsersTab> {
                           },
                           underline: Container(),
                         )),
+                        DataCell(Text(user.groupName)),
                         DataCell(
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -507,22 +509,45 @@ class _CategoriesTabState extends ConsumerState<CategoriesTab> {
 
   @override
   Widget build(BuildContext context) {
-    // In a real app we would load actual global categories.
-    // For now we can assume admin provider or category provider has them.
-    // Since adminProvider doesn't load categories in state yet, I'll just put the "Add" UI here
-    // and a placeholder list or fetch them via a future.
-    return Center(
+    final adminState = ref.watch(adminProvider);
+    final categories = adminState.globalCategories;
+
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.category, size: 64, color: Colors.grey),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Global Categories', style: Theme.of(context).textTheme.headlineSmall),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.add),
+                label: const Text('Add New Category'),
+                onPressed: _showAddCategoryDialog,
+              ),
+            ],
+          ),
           const SizedBox(height: 16),
-          const Text('Manage Global Categories'),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.add),
-            label: const Text('Add New Category'),
-            onPressed: _showAddCategoryDialog,
+          Expanded(
+            child: categories.isEmpty
+                ? const Center(child: Text('No global categories found.'))
+                : ListView.builder(
+                    itemCount: categories.length,
+                    itemBuilder: (context, index) {
+                      final cat = categories[index];
+                      return Card(
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: Color(cat.colorValue),
+                            child: Icon(IconData(cat.iconCode, fontFamily: 'MaterialIcons'), color: Colors.white),
+                          ),
+                          title: Text(cat.name),
+                          subtitle: Text(cat.isDefault ? 'Default' : 'Custom Global'),
+                        ),
+                      );
+                    },
+                  ),
           ),
         ],
       ),

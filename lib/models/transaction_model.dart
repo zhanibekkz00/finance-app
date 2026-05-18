@@ -92,10 +92,19 @@ class TransactionModel {
   }
 
   factory TransactionModel.fromMap(Map<String, dynamic> map) {
+    // Robust parsing of amount (handles both String and num from Decimal)
+    double parsedAmount = 0.0;
+    final amountVal = map['amount'];
+    if (amountVal is num) {
+      parsedAmount = amountVal.toDouble();
+    } else if (amountVal is String) {
+      parsedAmount = double.tryParse(amountVal) ?? 0.0;
+    }
+
     return TransactionModel(
       id: map['id'],
       type: TransactionType.values.firstWhere((e) => e.name == map['type']),
-      amount: (map['amount'] as num).toDouble(),
+      amount: parsedAmount,
       categoryId: map['categoryId'],
       date: DateTime.parse(map['date']),
       note: map['note'],

@@ -8,6 +8,9 @@ import { SettingsModule } from './settings/settings.module';
 import { CategoriesModule } from './categories/categories.module';
 import { TransactionsModule } from './transactions/transactions.module';
 import { GroupsModule } from './groups/groups.module';
+import { DebtsModule } from './debts/debts.module';
+import { AdminModule } from './admin/admin.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -20,6 +23,9 @@ import { GroupsModule } from './groups/groups.module';
     CategoriesModule,
     TransactionsModule,
     GroupsModule,
+    DebtsModule,
+    AdminModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

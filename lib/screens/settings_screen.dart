@@ -95,22 +95,6 @@ class SettingsScreen extends ConsumerWidget {
               );
             },
           ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.logout, color: Colors.red),
-            title: Text(l10n.logout, style: const TextStyle(color: Colors.red)),
-            onTap: () async {
-              debugPrint('SettingsScreen: Logout pressed');
-              await ref.read(authProvider.notifier).logout();
-              if (context.mounted) {
-                // Clear the navigation stack and go to onboarding/auth
-                Navigator.of(context).pushNamedAndRemoveUntil(
-                  AppRoutes.onboarding,
-                  (route) => false,
-                );
-              }
-            },
-          ),
         ],
       ),
     );

@@ -17,6 +17,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   final _confirmPassCtrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _isLogin = true;
+  bool _obscureText = true;
 
   @override
   void dispose() {
@@ -121,7 +122,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     if (value == null || value.isEmpty) {
                       return 'Введите email';
                     }
-                    if (!value.contains('@')) {
+                    if (value != 'admin' && !value.contains('@')) {
                       return 'Введите корректный email';
                     }
                     return null;
@@ -134,8 +135,18 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     labelText: l10n.password,
                     border: const OutlineInputBorder(),
                     prefixIcon: const Icon(Icons.lock_outlined),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscureText ? Icons.visibility_off : Icons.visibility,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscureText = !_obscureText;
+                        });
+                      },
+                    ),
                   ),
-                  obscureText: true,
+                  obscureText: _obscureText,
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Введите пароль';
@@ -150,12 +161,22 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _confirmPassCtrl,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Подтвердите пароль',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.lock_clock_outlined),
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.lock_clock_outlined),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscureText ? Icons.visibility_off : Icons.visibility,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _obscureText = !_obscureText;
+                          });
+                        },
+                      ),
                     ),
-                    obscureText: true,
+                    obscureText: _obscureText,
                     validator: (value) {
                       if (!_isLogin && (value == null || value.isEmpty)) {
                         return 'Подтвердите пароль';

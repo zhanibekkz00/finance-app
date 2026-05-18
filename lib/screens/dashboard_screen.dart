@@ -11,6 +11,8 @@ import 'edit_transaction_screen.dart';
 import 'category_stats_screen.dart';
 import '../widgets/category_quick_selector.dart';
 import '../widgets/transaction_share_helper.dart';
+import '../widgets/glass_container.dart';
+import '../widgets/neo_container.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -181,11 +183,27 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     }).toList();
 
     return Scaffold(
+      backgroundColor: const Color(0xFF1E1E2C),
       appBar: AppBar(
-        title: Text(l10n.dashboard),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: Text(l10n.dashboard, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
-              icon: const Icon(Icons.settings),
+              icon: const Icon(Icons.account_balance_wallet, color: Colors.white),
+              onPressed: () =>
+                  Navigator.pushNamed(context, AppRoutes.debts)),
+          IconButton(
+              icon: const Icon(Icons.pie_chart_outline, color: Colors.white),
+              onPressed: () =>
+                  Navigator.pushNamed(context, AppRoutes.groupStats)),
+          IconButton(
+              icon: const Icon(Icons.person_outline, color: Colors.white),
+              onPressed: () =>
+                  Navigator.pushNamed(context, AppRoutes.profile)),
+          IconButton(
+              icon: const Icon(Icons.settings, color: Colors.white),
               onPressed: () =>
                   Navigator.pushNamed(context, AppRoutes.settings)),
         ],
@@ -201,10 +219,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
                 ),
                 filled: true,
-                fillColor: Theme.of(context).cardColor,
+                fillColor: Colors.white.withOpacity(0.05),
+                hintStyle: const TextStyle(color: Colors.grey),
               ),
+              style: const TextStyle(color: Colors.white),
               onChanged: (v) => setState(() => _searchQuery = v),
             ),
           ),
@@ -218,90 +239,117 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     .read(categoryProvider.notifier)
                     .getCategoryById(tx.categoryId);
 
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: ListTile(
-                    leading: Stack(
-                      children: [
-                        CircleAvatar(
-                          backgroundColor: category != null
-                              ? Color(category.colorValue)
-                              : Colors.grey,
-                          child: Icon(
-                            category != null
-                                ? IconData(category.iconCode,
-                                    fontFamily: 'MaterialIcons')
-                                : Icons.help_outline,
-                            color: Colors.white,
-                          ),
-                        ),
-                        if (tx.isPinned)
-                          Positioned(
-                            right: 0,
-                            bottom: 0,
-                            child: Container(
-                              padding: const EdgeInsets.all(2),
-                              decoration: const BoxDecoration(
-                                color: Colors.orange,
-                                shape: BoxShape.circle,
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: GlassContainer(
+                    padding: 8,
+                    child: ListTile(
+                      leading: Stack(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                colors: category != null
+                                    ? [
+                                        Color(category.colorValue).withOpacity(0.8),
+                                        Color(category.colorValue),
+                                      ]
+                                    : [Colors.grey.withOpacity(0.8), Colors.grey],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
                               ),
-                              child: const Icon(
-                                Icons.push_pin,
-                                size: 12,
-                                color: Colors.white,
-                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: category != null
+                                      ? Color(category.colorValue).withOpacity(0.3)
+                                      : Colors.grey.withOpacity(0.3),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
+                                )
+                              ],
+                            ),
+                            child: Icon(
+                              category != null
+                                  ? IconData(category.iconCode, fontFamily: 'MaterialIcons')
+                                  : Icons.help_outline,
+                              color: Colors.white,
                             ),
                           ),
-                      ],
-                    ),
-                    title: Row(
-                      children: [
-                        Expanded(
-                            child: Text(category?.getLocalizedName(context) ??
-                                'Unknown')),
-                        if (tx.isPinned)
-                          const Icon(
-                            Icons.push_pin,
-                            size: 16,
-                            color: Colors.orange,
-                          ),
-                      ],
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (tx.note.isNotEmpty)
-                          Text(tx.note,
-                              style: const TextStyle(
-                                  fontSize: 12, color: Colors.grey)),
-                        Text(DateFormat.yMMMd(
-                                Localizations.localeOf(context).toString())
-                            .format(tx.date)),
-                      ],
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              '${tx.type == TransactionType.income ? '+' : '-'}${tx.amount} ${tx.currency}',
-                              style: TextStyle(
-                                color: tx.type == TransactionType.income
-                                    ? Colors.green
-                                    : Colors.red,
-                                fontWeight: FontWeight.bold,
+                          if (tx.isPinned)
+                            Positioned(
+                              right: 0,
+                              bottom: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: const BoxDecoration(
+                                  color: Colors.orange,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.push_pin,
+                                  size: 12,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
-                          ],
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.more_vert),
-                          onPressed: () => _showTransactionMenu(context, tx),
-                        ),
-                      ],
+                        ],
+                      ),
+                      title: Row(
+                        children: [
+                          Expanded(
+                              child: Text(
+                            category?.getLocalizedName(context) ?? 'Unknown',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          )),
+                          if (tx.isPinned)
+                            const Icon(
+                              Icons.push_pin,
+                              size: 16,
+                              color: Colors.orange,
+                            ),
+                        ],
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (tx.note.isNotEmpty)
+                            Text(tx.note,
+                                style: const TextStyle(
+                                    fontSize: 12, color: Colors.grey)),
+                          Text(
+                            DateFormat.yMMMd(Localizations.localeOf(context).toString())
+                                .format(tx.date),
+                            style: TextStyle(color: Colors.white.withOpacity(0.6)),
+                          ),
+                        ],
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                '${tx.type == TransactionType.income ? '+' : '-'}${tx.amount} ${tx.currency}',
+                                style: TextStyle(
+                                  color: tx.type == TransactionType.income
+                                      ? const Color(0xFF32D74B) // Mint
+                                      : const Color(0xFFFF375F), // Pink
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.more_vert, color: Colors.grey),
+                            onPressed: () => _showTransactionMenu(context, tx),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 );

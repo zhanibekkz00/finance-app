@@ -1,17 +1,16 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/category_model.dart';
-import '../models/transaction_model.dart';
+import '../services/api_service.dart';
 
 // --- Models ---
 
 class AdminStats {
   final int totalUsers;
   final double totalTransactionVolume;
-  final List<MapEntry<String, double>>
-      popularCategories; // Category ID -> Amount
-  final List<int> newUsersPerDay; // Last 7 days
+  final List<MapEntry<String, double>> popularCategories;
+  final List<int> newUsersPerDay;
 
   AdminStats({
     required this.totalUsers,
@@ -19,14 +18,26 @@ class AdminStats {
     required this.popularCategories,
     required this.newUsersPerDay,
   });
+
+  factory AdminStats.fromMap(Map<String, dynamic> data) {
+    return AdminStats(
+      totalUsers: data['totalUsers'] ?? 0,
+      totalTransactionVolume: (data['totalTransactionVolume'] ?? 0).toDouble(),
+      popularCategories: (data['popularCategories'] as List? ?? []).map((e) {
+        return MapEntry<String, double>(e['key'], (e['value'] ?? 0).toDouble());
+      }).toList(),
+      newUsersPerDay: List<int>.from(data['newUsersPerDay'] ?? []),
+    );
+  }
 }
 
 class UserProfile {
   final String id;
   final String email;
-  final String role; // 'user' or 'admin'
+  final String role;
   final bool isBlocked;
   final DateTime createdAt;
+  final String groupName;
 
   UserProfile({
     required this.id,
@@ -34,25 +45,18 @@ class UserProfile {
     required this.role,
     this.isBlocked = false,
     required this.createdAt,
+    this.groupName = 'No Group',
   });
 
-  factory UserProfile.fromMap(String id, Map<String, dynamic> data) {
+  factory UserProfile.fromMap(Map<String, dynamic> data) {
     return UserProfile(
-      id: id,
+      id: data['id'],
       email: data['email'] ?? '',
       role: data['role'] ?? 'user',
       isBlocked: data['isBlocked'] ?? false,
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: data['createdAt'] != null ? DateTime.parse(data['createdAt']) : DateTime.now(),
+      groupName: data['group']?['name'] ?? 'No Group',
     );
-  }
-
-  Map<String, dynamic> toMap() {
-    return {
-      'email': email,
-      'role': role,
-      'isBlocked': isBlocked,
-      'createdAt': Timestamp.fromDate(createdAt),
-    };
   }
 }
 
@@ -62,12 +66,14 @@ class AdminState {
   final bool isLoading;
   final AdminStats? stats;
   final List<UserProfile> users;
+  final List<CategoryModel> globalCategories;
   final String? errorMessage;
 
   AdminState({
     this.isLoading = false,
     this.stats,
     this.users = const [],
+    this.globalCategories = const [],
     this.errorMessage,
   });
 
@@ -75,12 +81,14 @@ class AdminState {
     bool? isLoading,
     AdminStats? stats,
     List<UserProfile>? users,
+    List<CategoryModel>? globalCategories,
     String? errorMessage,
   }) {
     return AdminState(
       isLoading: isLoading ?? this.isLoading,
       stats: stats ?? this.stats,
       users: users ?? this.users,
+      globalCategories: globalCategories ?? this.globalCategories,
       errorMessage: errorMessage,
     );
   }
@@ -89,81 +97,34 @@ class AdminState {
 // --- Notifier ---
 
 class AdminNotifier extends StateNotifier<AdminState> {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final ApiService _apiService = ApiService();
 
   AdminNotifier() : super(AdminState());
 
   Future<void> loadDashboardData() async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      // 1. Fetch Users
-      final usersSnapshot = await _firestore.collection('users').get();
-      final users = usersSnapshot.docs
-          .map((doc) => UserProfile.fromMap(doc.id, doc.data()))
-          .toList();
+      final dashboardResponse = await _apiService.get('/admin/dashboard');
+      final usersResponse = await _apiService.get('/admin/users');
+      final catsResponse = await _apiService.get('/admin/categories');
 
-      // 2. Fetch Transactions for Stats
-      // Note: In a real large-scale app, we would use aggregated counters.
-      // Fetching all transactions is expensive but requested here.
-      final txSnapshot = await _firestore.collection('transactions').get();
-      final transactions = txSnapshot.docs.map((doc) {
-        final data = doc.data();
-        return TransactionModel(
-          id: doc.id,
-          type: TransactionType.values.firstWhere(
-              (e) => e.name == (data['type'] ?? 'expense'),
-              orElse: () => TransactionType.expense),
-          amount: (data['amount'] as num).toDouble(),
-          categoryId: data['categoryId'] ?? '',
-          date: (data['date'] as Timestamp).toDate(),
-          note: '',
-          isRecurring: false,
-          userId: data['userId'],
+      if (dashboardResponse.statusCode == 200 && usersResponse.statusCode == 200) {
+        final dashboardData = jsonDecode(dashboardResponse.body);
+        final usersData = jsonDecode(usersResponse.body) as List;
+        final catsData = catsResponse.statusCode == 200 ? jsonDecode(catsResponse.body) as List : [];
+
+        final users = usersData.map((d) => UserProfile.fromMap(d)).toList();
+        final globalCategories = catsData.map((d) => CategoryModel.fromMap(d)).toList();
+
+        state = state.copyWith(
+          isLoading: false,
+          users: users,
+          globalCategories: globalCategories,
+          stats: AdminStats.fromMap(dashboardData),
         );
-      }).toList();
-
-      // Calculate Stats
-      double totalVolume = 0;
-      final categorySpending = <String, double>{};
-
-      for (var tx in transactions) {
-        totalVolume += tx.amount;
-        if (tx.type == TransactionType.expense) {
-          categorySpending.update(
-            tx.categoryId,
-            (value) => value + tx.amount,
-            ifAbsent: () => tx.amount,
-          );
-        }
+      } else {
+        throw Exception('Failed to load dashboard data');
       }
-
-      final sortedCategories = categorySpending.entries.toList()
-        ..sort((a, b) => b.value.compareTo(a.value));
-
-      final popularCategories = sortedCategories.take(5).toList();
-
-      // New users last 7 days (mock logic if dates aren't perfect, but trying real)
-      final now = DateTime.now();
-      final last7Days = List.generate(7, (index) {
-        final day = now.subtract(Duration(days: index));
-        return users
-            .where((u) =>
-                u.createdAt.year == day.year &&
-                u.createdAt.month == day.month &&
-                u.createdAt.day == day.day)
-            .length;
-      }).reversed.toList();
-
-      state = state.copyWith(
-        isLoading: false,
-        users: users,
-        stats: AdminStats(
-          totalUsers: users.length,
-          totalTransactionVolume: totalVolume,
-          popularCategories: popularCategories,
-          newUsersPerDay: last7Days,
-        ),
-      );
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
     }
@@ -171,23 +132,26 @@ class AdminNotifier extends StateNotifier<AdminState> {
 
   Future<void> toggleUserBlockStatus(String userId, bool currentStatus) async {
     try {
-      await _firestore.collection('users').doc(userId).update({
+      final response = await _apiService.patch('/admin/users/$userId/block', {
         'isBlocked': !currentStatus,
       });
-      // specific user update locally to avoid full reload
-      final updatedUsers = state.users.map((u) {
-        if (u.id == userId) {
-          return UserProfile(
-            id: u.id,
-            email: u.email,
-            role: u.role,
-            isBlocked: !currentStatus,
-            createdAt: u.createdAt,
-          );
-        }
-        return u;
-      }).toList();
-      state = state.copyWith(users: updatedUsers);
+
+      if (response.statusCode == 200) {
+        final updatedUsers = state.users.map((u) {
+          if (u.id == userId) {
+            return UserProfile(
+              id: u.id,
+              email: u.email,
+              role: u.role,
+              isBlocked: !currentStatus,
+              createdAt: u.createdAt,
+              groupName: u.groupName,
+            );
+          }
+          return u;
+        }).toList();
+        state = state.copyWith(users: updatedUsers);
+      }
     } catch (e) {
       debugPrint('Error blocking user: $e');
     }
@@ -195,22 +159,26 @@ class AdminNotifier extends StateNotifier<AdminState> {
 
   Future<void> updateUserRole(String userId, String newRole) async {
     try {
-      await _firestore.collection('users').doc(userId).update({
+      final response = await _apiService.patch('/admin/users/$userId/role', {
         'role': newRole,
       });
-      final updatedUsers = state.users.map((u) {
-        if (u.id == userId) {
-          return UserProfile(
-            id: u.id,
-            email: u.email,
-            role: newRole,
-            isBlocked: u.isBlocked,
-            createdAt: u.createdAt,
-          );
-        }
-        return u;
-      }).toList();
-      state = state.copyWith(users: updatedUsers);
+
+      if (response.statusCode == 200) {
+        final updatedUsers = state.users.map((u) {
+          if (u.id == userId) {
+            return UserProfile(
+              id: u.id,
+              email: u.email,
+              role: newRole,
+              isBlocked: u.isBlocked,
+              createdAt: u.createdAt,
+              groupName: u.groupName,
+            );
+          }
+          return u;
+        }).toList();
+        state = state.copyWith(users: updatedUsers);
+      }
     } catch (e) {
       debugPrint('Error updating role: $e');
     }
@@ -218,45 +186,44 @@ class AdminNotifier extends StateNotifier<AdminState> {
 
   Future<void> addGlobalCategory(CategoryModel category) async {
     try {
-      await _firestore.collection('categories').add({
-        ...category.toMap(),
-        'isGlobal': true, // Explicitly mark as global
+      final response = await _apiService.post('/admin/categories', {
+        'name': category.name,
+        'colorValue': category.colorValue,
+        'iconCode': category.iconCode,
+        'isDefault': category.isDefault,
       });
+      if (response.statusCode != 201) {
+         throw Exception('Failed to add category. \nStatus: ${response.statusCode} \nBody: ${response.body}');
+      }
     } catch (e) {
       debugPrint('Error adding category: $e');
-      throw e;
+      rethrow;
     }
   }
 
   Future<void> sendNotification(String title, String body) async {
     try {
-      // 1. Queue for push delivery (handled by Cloud Functions normally)
-      await _firestore.collection('notifications_queue').add({
+      final response = await _apiService.post('/admin/notifications', {
         'title': title,
         'body': body,
-        'target': 'all',
-        'createdAt': FieldValue.serverTimestamp(),
-        'status': 'pending',
       });
-
-      // 2. Save to persistent history for users to read in-app
-      await _firestore.collection('notifications').add({
-        'title': title,
-        'body': body,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      if (response.statusCode != 201) {
+         throw Exception('Failed to send notification.');
+      }
     } catch (e) {
       debugPrint('Error sending notification: $e');
-      throw e;
+      rethrow;
     }
   }
 
-  // Method to check if current user is admin
   Future<bool> checkIsAdmin(String userId) async {
     try {
-      final doc = await _firestore.collection('users').doc(userId).get();
-      if (!doc.exists) return false;
-      return doc.data()?['role'] == 'admin';
+      final response = await _apiService.get('/auth/me');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['role'] == 'admin';
+      }
+      return false;
     } catch (e) {
       return false;
     }

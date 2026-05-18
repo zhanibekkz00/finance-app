@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class NotificationModel {
   final String id;
   final String title;
@@ -13,12 +11,12 @@ class NotificationModel {
     required this.createdAt,
   });
 
-  factory NotificationModel.fromMap(String id, Map<String, dynamic> map) {
+  factory NotificationModel.fromMap(Map<String, dynamic> map) {
     return NotificationModel(
-      id: id,
+      id: map['id'] ?? '',
       title: map['title'] ?? '',
       body: map['body'] ?? '',
-      createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: map['createdAt'] != null ? DateTime.parse(map['createdAt']) : DateTime.now(),
     );
   }
 
@@ -26,7 +24,7 @@ class NotificationModel {
     return {
       'title': title,
       'body': body,
-      'createdAt': Timestamp.fromDate(createdAt),
+      'createdAt': createdAt.toIso8601String(),
     };
   }
 }

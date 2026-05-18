@@ -28,7 +28,7 @@ export class TransactionsController {
     @Query('type') type?: string,
     @Query('categoryId') categoryId?: string,
   ) {
-    return this.transactionsService.findAll(req.user.userId, {
+    return this.transactionsService.findAll(req.user.id, {
       from,
       to,
       type,
@@ -44,7 +44,7 @@ export class TransactionsController {
     @Query('to') to?: string,
   ) {
     return this.transactionsService.getCategoryStats(
-      req.user.userId,
+      req.user.id,
       categoryId,
       from,
       to,
@@ -53,12 +53,12 @@ export class TransactionsController {
 
   @Get(':id')
   async findOne(@Request() req, @Param('id') id: string) {
-    return this.transactionsService.findOne(req.user.userId, id);
+    return this.transactionsService.findOne(req.user.id, id);
   }
 
   @Post()
   async create(@Request() req, @Body() dto: CreateTransactionDto) {
-    return this.transactionsService.create(req.user.userId, dto);
+    return this.transactionsService.create(req.user.id, dto);
   }
 
   @Put(':id')
@@ -67,16 +67,16 @@ export class TransactionsController {
     @Param('id') id: string,
     @Body() dto: UpdateTransactionDto,
   ) {
-    return this.transactionsService.update(req.user.userId, id, dto);
+    return this.transactionsService.update(req.user.id, id, dto);
   }
 
   @Delete(':id')
   async delete(@Request() req, @Param('id') id: string) {
-    return this.transactionsService.delete(req.user.userId, id);
+    return this.transactionsService.delete(req.user.id, id);
   }
 
   @Put(':id/pin')
   async togglePin(@Request() req, @Param('id') id: string) {
-    return this.transactionsService.togglePin(req.user.userId, id);
+    return this.transactionsService.togglePin(req.user.id, id);
   }
 }

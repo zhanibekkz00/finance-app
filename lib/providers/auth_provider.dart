@@ -1,7 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../services/api_service.dart';
 
 enum AuthStatus { authenticated, unauthenticated, loading }
 
@@ -10,73 +11,75 @@ class AuthState {
   final String? email;
   final String? userId;
   final String? role;
+  final String? displayName;
 
-  AuthState(
-      {this.status = AuthStatus.unauthenticated,
-      this.email,
-      this.userId,
-      this.role});
+  AuthState({
+    this.status = AuthStatus.unauthenticated,
+    this.email,
+    this.userId,
+    this.role,
+    this.displayName,
+  });
 }
 
 class AuthNotifier extends StateNotifier<AuthState> {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final ApiService _apiService = ApiService();
 
   AuthNotifier() : super(AuthState(status: AuthStatus.loading)) {
     _init();
   }
 
-  void _init() {
-    _auth.authStateChanges().listen((User? user) async {
-      if (user != null) {
-        final role = await _fetchUserRole(user.uid);
+  Future<void> _init() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
 
+    if (token != null) {
+      await fetchProfile();
+    } else {
+      state = AuthState(status: AuthStatus.unauthenticated);
+    }
+  }
+
+  Future<void> fetchProfile() async {
+    try {
+      final response = await _apiService.get('/auth/me');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
         state = AuthState(
           status: AuthStatus.authenticated,
-          email: user.email,
-          userId: user.uid,
-          role: role,
+          email: data['email'],
+          userId: data['id'],
+          role: data['role'] ?? 'user',
+          displayName: data['displayName'],
         );
       } else {
-        state = AuthState(status: AuthStatus.unauthenticated);
+        await logout();
       }
-    });
+    } catch (e) {
+      debugPrint('Error fetching profile: $e');
+      state = AuthState(status: AuthStatus.unauthenticated);
+    }
   }
 
   Future<bool> login(String email, String password) async {
+    if (email == 'admin') email = 'admin@admin.com';
     state = AuthState(status: AuthStatus.loading);
     try {
-      final userCredential = await _auth.signInWithEmailAndPassword(
-          email: email, password: password);
+      final response = await _apiService.post('/auth/login', {
+        'email': email,
+        'password': password,
+      });
 
-      // Force 'admin' role if specific credentials match
-      if (email.trim().toLowerCase() == 'admin@gmail.com' &&
-          password == '1234567') {
-        await _firestore
-            .collection('users')
-            .doc(userCredential.user!.uid)
-            .update({'role': 'admin'});
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final token = data['token'];
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('auth_token', token);
+
+        await fetchProfile();
+        return true;
       }
-
-      // Explicitly fetch role after login to avoid race condition with stream
-      final role = await _fetchUserRole(userCredential.user!.uid);
-
-      state = AuthState(
-        status: AuthStatus.authenticated,
-        email: userCredential.user!.email,
-        userId: userCredential.user!.uid,
-        role: role,
-      );
-
-      return true;
-    } on FirebaseAuthException catch (e) {
-      if ((e.code == 'invalid-credential' || e.code == 'user-not-found') &&
-          email.trim().toLowerCase() == 'admin@gmail.com' &&
-          password == '1234567') {
-        debugPrint('Admin account not found, attempting auto-registration...');
-        return register(email, password);
-      }
-      debugPrint('Login error: $e');
       state = AuthState(status: AuthStatus.unauthenticated);
       return false;
     } catch (e) {
@@ -89,31 +92,24 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<bool> register(String email, String password) async {
     state = AuthState(status: AuthStatus.loading);
     try {
-      final userCredential = await _auth.createUserWithEmailAndPassword(
-          email: email, password: password);
-
-      String role = 'user';
-      if (email.trim().toLowerCase() == 'admin@gmail.com' &&
-          password == '1234567') {
-        role = 'admin';
-      }
-
-      await _firestore.collection('users').doc(userCredential.user!.uid).set({
+      // Create user
+      final response = await _apiService.post('/auth/register', {
         'email': email,
-        'role': role,
-        'createdAt': FieldValue.serverTimestamp(),
-        'isBlocked': false,
+        'password': password,
       });
 
-      // Explicitly set state with role to ensure UI redirects correctly
-      state = AuthState(
-        status: AuthStatus.authenticated,
-        email: userCredential.user!.email,
-        userId: userCredential.user!.uid,
-        role: role,
-      );
+      if (response.statusCode == 201) {
+        final data = jsonDecode(response.body);
+        final token = data['token'];
 
-      return true;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('auth_token', token);
+
+        await fetchProfile();
+        return true;
+      }
+      state = AuthState(status: AuthStatus.unauthenticated);
+      return false;
     } catch (e) {
       debugPrint('Registration error: $e');
       state = AuthState(status: AuthStatus.unauthenticated);
@@ -121,21 +117,25 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<String> _fetchUserRole(String uid) async {
+  Future<void> updateProfile({String? displayName, String? avatarUrl}) async {
     try {
-      final doc = await _firestore.collection('users').doc(uid).get();
-      if (doc.exists) {
-        return doc.data()?['role'] ?? 'user';
+      final response = await _apiService.patch('/auth/profile', {
+        if (displayName != null) 'displayName': displayName,
+        if (avatarUrl != null) 'avatarUrl': avatarUrl,
+      });
+
+      if (response.statusCode == 200) {
+        await fetchProfile();
       }
     } catch (e) {
-      debugPrint('Error fetching user role: $e');
+      debugPrint('Error updating profile: $e');
     }
-    return 'user';
   }
 
   Future<void> logout() async {
-    await _auth.signOut();
-    // State is updated automatically by authStateChanges listener
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('auth_token');
+    state = AuthState(status: AuthStatus.unauthenticated);
   }
 }
 
